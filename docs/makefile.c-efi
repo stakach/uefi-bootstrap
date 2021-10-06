@@ -1,0 +1,26 @@
+TARGET = bin/BOOTX64.efi
+
+CC = clang
+IDIR = src
+
+CFLAGS+= \
+        -I$(IDIR) \
+        -target x86_64-unknown-windows \
+        -ffreestanding \
+        -fshort-wchar \
+        -mno-red-zone \
+				-Wall
+
+LDFLAGS+= \
+        -target x86_64-unknown-windows \
+        -nostdlib \
+        -Wl,-entry:efi_main \
+        -Wl,-subsystem:efi_application \
+        -fuse-ld=lld
+
+src = $(wildcard src/*.c)
+# using objects here so we can inspect them with `nm -C hello-world.o`
+obj = $(patsubst %.c,%.o,$(wildcard src/*.c))
+
+$(TARGET): $(obj)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)

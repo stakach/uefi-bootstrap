@@ -6,10 +6,16 @@ Easiest to test on Windows. Compile on Win Linux layer, macOS or Linux
 
 EFI expects the bootable file to be in COFF/PE32+ format
 
-1. run `make`
-2. this will output `bin/bootx64.efi`
-3. you can expect symbols in the object files using `nm -C uefi_system.obj`
-  * anything with a `U` tag, i.e. `U memcpy` means memcpy needs to be defined in your project
+* See https://dvdhrm.github.io/2019/01/31/goodbye-gnuefi/
+* Example https://github.com/c-util/c-efi
+
+### Building c-efi on OSX
+
+1. follow the build instructions on https://github.com/c-util/c-efi
+2. in the generated `build.ninja` file remove references to `,-undefined,error`
+3. run the `ninja` step again
+4. rename `example-hello-world` to `BOOTX64.efi`
+
 
 ## Create a disk image for booting
 
@@ -21,7 +27,7 @@ Very simple to do this on Windows
   * Format as FAT32
 * create the following folder:
   * `/efi/boot`
-  * add bootstrap file as `bootx64.efi`
+  * add bootstrap file as `BOOTX64.efi`
 
 unmount the disk before booting it in VirtualBox
 
@@ -37,4 +43,4 @@ unmount the disk before booting it in VirtualBox
   * System -> Check "Enable EFI"
   * Storage -> Add default IDE + select VHD image from above
 
-Starting the VM will now boot the bootx64.efi file
+Starting the VM will now boot the BOOTX64.efi file
