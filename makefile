@@ -1,5 +1,5 @@
-.PHONY : dats
-dats : bin/uefi_system.obj bin/bootx64.efi
+.PHONY : uefi_bootstrap
+uefi_bootstrap : bin/uefi_system.obj bin/bootx64.efi
 
 ZFLAGS = \
 				-target x86_64-uefi \
