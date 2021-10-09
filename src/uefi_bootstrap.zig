@@ -6,28 +6,11 @@
 
 const uefi = @import("std").os.uefi;
 const fmt = @import("std").fmt;
+const console = @import("./console.zig");
 const load_kernel_image = @import("./loader.zig").load_kernel_image;
 
-var console_out: *uefi.protocols.SimpleTextOutputProtocol = undefined;
-
-// EFI uses UCS-2 encoded null-terminated strings. UCS-2 encodes
-// code points in exactly 16 bit. Unlike UTF-16, it does not support all
-// Unicode code points.
-// We need to print each character in an [_]u8 individually because EFI
-// encodes strings as UCS-2.
-fn puts(msg: []const u8) void {
-    for (msg) |c| {
-        const c_ = [2]u16{ c, 0 }; // work around https://github.com/ziglang/zig/issues/4372
-        _ = console_out.outputString(@ptrCast(*const [1:0]u16, &c_));
-    }
-}
-
-fn printf(buf: []u8, comptime format: []const u8, args: anytype) void {
-    puts(fmt.bufPrint(buf, format, args) catch unreachable);
-}
-
 export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(.C) uefi.Status {
-    console_out = system_table.con_out.?;
+    console.out = system_table.con_out.?;
     const console_in = system_table.con_in.?;
     const boot_services = system_table.boot_services.?;
 
@@ -35,16 +18,16 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     var printf_buf: [100]u8 = undefined;
 
     // Clear screen. reset() returns usize(0) on success
-    var result = console_out.clearScreen();
+    var result = console.out.clearScreen();
     if (uefi.Status.Success != result) { return result; }
 
     // obtain access to the file system
-    puts("initialising File System service...");
+    console.puts("initialising File System service...");
     var simple_file_system: ?*uefi.protocols.SimpleFileSystemProtocol = undefined;
     result = boot_services.locateProtocol(&uefi.protocols.SimpleFileSystemProtocol.guid, null, @ptrCast(*?*c_void, &simple_file_system));
     if (result != uefi.Status.Success) {
-        puts(" [failed]\r\n");
-        printf(printf_buf[0..], "ERROR {}: initialising file system\r\n", .{result});
+        console.puts(" [failed]\r\n");
+        console.printf(printf_buf[0..], "ERROR {}: initialising file system\r\n", .{result});
         return result;
     }
 
@@ -52,28 +35,34 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     var root_file_system: *uefi.protocols.FileProtocol = undefined;
     result = simple_file_system.?.openVolume(&root_file_system);
     if (result != uefi.Status.Success) {
-        puts(" [failed]\r\n");
-        printf(printf_buf[0..], "ERROR {}: opening file system volume\r\n", .{result});
+        console.puts(" [failed]\r\n");
+        console.printf(printf_buf[0..], "ERROR {}: opening file system volume\r\n", .{result});
         return result;
     }
-    puts(" [done]\r\n");
+    console.puts(" [done]\r\n");
 
-    // Start moving the kernel image into memory
-    puts("loading kernel...");
-    _ = load_kernel_image();
+    // Start moving the kernel image into memory (\kernel.elf)
+    console.puts("loading kernel...\r\n");
+    result = load_kernel_image(boot_services, root_file_system, &[_:0]u16{ '\\', 'k', 'e', 'r', 'n', 'e', 'l', '.', 'e', 'l', 'f' });
+    if (result != uefi.Status.Success) {
+        console.puts(" [failed]\r\n");
+        console.printf(printf_buf[0..], "ERROR {}: loading kernel\r\n", .{result});
+        return result;
+    }
+    console.puts("loading kernel... [done]\r\n");
 
     // prevent system reboot if we don't check-in
-    puts("disabling watchdog timer...");
+    console.puts("disabling watchdog timer...");
     result = boot_services.setWatchdogTimer(0, 0, 0, null);
     if (result != uefi.Status.Success) {
-        puts(" [failed]\r\n");
-        printf(printf_buf[0..], "ERROR {}: disabling watchdog timer\r\n", .{result});
+        console.puts(" [failed]\r\n");
+        console.printf(printf_buf[0..], "ERROR {}: disabling watchdog timer\r\n", .{result});
         return result;
     }
-    puts(" [done]\r\n");
+    console.puts(" [done]\r\n");
 
 
-    puts("jumping to kernel...");
+    console.puts("jumping to kernel...");
 
     // get the current memory map
     var memory_map: [*]uefi.tables.MemoryDescriptor = undefined;
@@ -127,23 +116,4 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
 
     while (true) {}
     return uefi.Status.LoadError;
-}
-
-// implement memcpy as we're not including stdlib
-export fn memcpy(dest: [*:0]u8, source: [*:0]const u8, length: u64) [*:0]u8 {
-    var index: u64 = 0;
-    while (index < length) {
-        dest[index] = source[index];
-        index += 1;
-    }
-    return dest;
-}
-
-export fn memset (dest: [*:0]u8, value: u8, length: u64) [*:0]u8 {
-    var index: u64 = 0;
-    while (index < length) {
-        dest[index] = value;
-        index += 1;
-    }
-    return dest;
 }

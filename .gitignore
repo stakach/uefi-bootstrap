@@ -1,4 +1,5 @@
 *.efi
 *.obj
+*.elf
 *.DS_Store
 zig-cache
