@@ -8,7 +8,7 @@ EFI expects the bootable file to be in COFF/PE32+ format
 
 1. run `make`
 2. this will output `bin/bootx64.efi`
-3. you can expect symbols in the object files using `nm -C uefi_system.obj`
+3. you can expect symbols in the object files using `nm -C bin/uefi_bootstrap.obj`
   * anything with a `U` tag, i.e. `U memcpy` means memcpy needs to be defined in your project
 
 ## Create a disk image for booting
