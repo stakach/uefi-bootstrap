@@ -9,17 +9,39 @@ const fmt = @import("std").fmt;
 const console = @import("./console.zig");
 const load_kernel_image = @import("./loader.zig").load_kernel_image;
 
+pub var boot_services: *uefi.tables.BootServices = undefined;
+
 export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(.C) uefi.Status {
     console.out = system_table.con_out.?;
-    const console_in = system_table.con_in.?;
-    const boot_services = system_table.boot_services.?;
+    boot_services = system_table.boot_services.?;
 
-    // For use with formatting strings
-    var printf_buf: [100]u8 = undefined;
+    console.puts("bootloader started\r\n");
 
     // Clear screen. reset() returns usize(0) on success
     var result = console.out.clearScreen();
     if (uefi.Status.Success != result) { return result; }
+
+    console.puts("configuring graphics mode...\r\n");
+
+    // Graphics output?
+    var graphics_output_protocol: ?*uefi.protocols.GraphicsOutputProtocol = undefined;
+    if (boot_services.locateProtocol(&uefi.protocols.GraphicsOutputProtocol.guid, null, @ptrCast(*?*c_void, &graphics_output_protocol)) == uefi.Status.Success) {
+        // Check supported resolutions:
+        var i: u32 = 0;
+        while (i < graphics_output_protocol.?.mode.max_mode) : (i += 1) {
+            var info: *uefi.protocols.GraphicsOutputModeInformation = undefined;
+            var info_size: usize = undefined;
+            _ = graphics_output_protocol.?.queryMode(i, &info_size, &info);
+            console.printf("    mode {} = {}x{} format: {}\r\n", .{ i, info.horizontal_resolution, info.vertical_resolution, info.pixel_format });
+        }
+
+        console.printf("    current mode = {}\r\n", .{graphics_output_protocol.?.mode.mode});
+
+        // TODO:: search for compatible mode
+        //_ = graphics_output_protocol.?.setMode(2);
+    } else {
+        console.puts("[error] unable to configure graphics mode\r\n");
+    }
 
     // obtain access to the file system
     console.puts("initialising File System service...");
@@ -27,7 +49,7 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     result = boot_services.locateProtocol(&uefi.protocols.SimpleFileSystemProtocol.guid, null, @ptrCast(*?*c_void, &simple_file_system));
     if (result != uefi.Status.Success) {
         console.puts(" [failed]\r\n");
-        console.printf(printf_buf[0..], "ERROR {}: initialising file system\r\n", .{result});
+        console.printf("ERROR {}: initialising file system\r\n", .{result});
         return result;
     }
 
@@ -36,17 +58,22 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     result = simple_file_system.?.openVolume(&root_file_system);
     if (result != uefi.Status.Success) {
         console.puts(" [failed]\r\n");
-        console.printf(printf_buf[0..], "ERROR {}: opening file system volume\r\n", .{result});
+        console.printf("ERROR {}: opening file system volume\r\n", .{result});
         return result;
     }
     console.puts(" [done]\r\n");
 
     // Start moving the kernel image into memory (\kernel.elf)
     console.puts("loading kernel...\r\n");
-    result = load_kernel_image(boot_services, root_file_system, &[_:0]u16{ '\\', 'k', 'e', 'r', 'n', 'e', 'l', '.', 'e', 'l', 'f' });
+    var entry_point: u64 = 0;
+    result = load_kernel_image(
+        root_file_system,
+        &[_:0]u16{ '\\', 'k', 'e', 'r', 'n', 'e', 'l', '.', 'e', 'l', 'f' },
+        &entry_point
+    );
     if (result != uefi.Status.Success) {
         console.puts(" [failed]\r\n");
-        console.printf(printf_buf[0..], "ERROR {}: loading kernel\r\n", .{result});
+        console.printf("ERROR {}: loading kernel\r\n", .{result});
         return result;
     }
     console.puts("loading kernel... [done]\r\n");
@@ -56,13 +83,18 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     result = boot_services.setWatchdogTimer(0, 0, 0, null);
     if (result != uefi.Status.Success) {
         console.puts(" [failed]\r\n");
-        console.printf(printf_buf[0..], "ERROR {}: disabling watchdog timer\r\n", .{result});
+        console.printf("ERROR {}: disabling watchdog timer\r\n", .{result});
         return result;
     }
     console.puts(" [done]\r\n");
 
-
-    console.puts("jumping to kernel...");
+    // Build the boot info
+    var video_buffer = VideoBuffer{
+        .frame_buffer_base = graphics_output_protocol.?.mode.frame_buffer_base,
+        .frame_buffer_size = graphics_output_protocol.?.mode.frame_buffer_base,
+    };
+    console.printf("graphics buffer@{}\r\n", .{video_buffer.frame_buffer_base});
+    console.printf("jumping to kernel... @{}\r\n", .{entry_point});
 
     // get the current memory map
     var memory_map: [*]uefi.tables.MemoryDescriptor = undefined;
@@ -102,7 +134,8 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
         result = boot_services.exitBootServices(uefi.handle, memory_map_key);
     }
 
-    // TODO:: jump to kernel here!
+    //drawTriangle(graphics_buffer, 1024 / 2, 768 / 2 - 25, 100, 0x00119911);
+    console.draw_triangle(video_buffer.frame_buffer_base, 1024 / 2, 768 / 3 - 25, 100, 0x00119911);
 
     // Set kernel boot info.
     // boot_info.memory_map = memory_map;
@@ -110,10 +143,16 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     // boot_info.memory_map_descriptor_size = descriptor_size;
 
     // Cast pointer to kernel entry.
-    // kernel_entry = (void (*)(Kernel_Boot_Info*))*kernel_entry_point;
     // Jump to kernel entry.
-    // kernel_entry(&boot_info);
+    var boot_info: *u64 = @intToPtr(*u64, 0x100000);
+    boot_info.* = @ptrToInt(&video_buffer);
+    @intToPtr(fn() callconv(.C) void, entry_point)();
 
-    while (true) {}
+    // Should never make it here
     return uefi.Status.LoadError;
 }
+
+const VideoBuffer = extern struct {
+    frame_buffer_base: u64,
+    frame_buffer_size: u64,
+};
