@@ -3,6 +3,9 @@ const elf = @import("std").elf;
 const console = @import("./console.zig");
 const bootstrap = @import("./uefi_bootstrap.zig");
 
+// Docs: https://github.com/ziglang/zig/blob/master/lib/std/elf.zig
+// https://github.com/ziglang/zig/blob/master/lib/std/os/uefi/protocols/file_protocol.zig
+
 pub fn load_kernel_image(
     file_system: *uefi.protocols.FileProtocol,
     file_path: [*:0]const u16,

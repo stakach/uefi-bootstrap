@@ -1,6 +1,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// https://github.com/JSBattista/Characters_To_Linux_Buffer_THE_HARD_WAY/blob/master/display.c
+
 #define DESIRED_HREZ            1024
 #define DESIRED_VREZ             768
 

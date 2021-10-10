@@ -1,6 +1,8 @@
 const uefi = @import("std").os.uefi;
 const fmt = @import("std").fmt;
 
+// https://github.com/ziglang/zig/blob/master/lib/std/os/uefi/protocols/simple_text_output_protocol.zig
+
 pub var out: *uefi.protocols.SimpleTextOutputProtocol = undefined;
 
 // EFI uses UCS-2 encoded null-terminated strings. UCS-2 encodes
