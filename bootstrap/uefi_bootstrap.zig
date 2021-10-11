@@ -138,10 +138,10 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
 
     // Put the boot information in a pre-determined location
     var boot_info_ptr: *u64 = @intToPtr(*u64, 0x100000);
+    boot_info_ptr.* = @ptrToInt(&boot_info);
 
     // Cast pointer to kernel entry.
     // Jump to kernel entry.
-    boot_info_ptr.* = @ptrToInt(&boot_info);
     @intToPtr(fn() callconv(.C) void, entry_point)();
 
     // Should never make it here
