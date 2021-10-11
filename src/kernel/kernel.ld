@@ -8,11 +8,15 @@ KERNEL_STACK_SIZE = 0x4000;
 SECTIONS
 {
 	. = KERNEL_PHYS_START;
+  kernel_start = .;
 
-	.text :
+	.text : ALIGN (4K)
 	{
     /** pointer to boot information. */
+    boot_info = .;
     . = . + 8;
+
+    /** start of kernel code. */
 		*(.text*)
 	}
 

@@ -87,13 +87,7 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
         return result;
     }
     console.puts(" [done]\r\n");
-
-    // Build the boot info
-    var video_buffer = VideoBuffer{
-        .frame_buffer_base = graphics_output_protocol.?.mode.frame_buffer_base,
-        .frame_buffer_size = graphics_output_protocol.?.mode.frame_buffer_base,
-    };
-    console.printf("graphics buffer@{}\r\n", .{video_buffer.frame_buffer_base});
+    console.printf("graphics buffer@{}\r\n", .{graphics_output_protocol.?.mode.frame_buffer_base});
     console.printf("jumping to kernel... @{}\r\n", .{entry_point});
 
     // get the current memory map
@@ -128,31 +122,33 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
         // being modified, the table's CRC32 must be recomputed.
         //
         // All events of type event_signal_exit_boot_services will be signaled.
-        //
-        // Runtime services may be used. However, some restrictions apply. See the
-        // UEFI specification for more information.
         result = boot_services.exitBootServices(uefi.handle, memory_map_key);
     }
 
-    //drawTriangle(graphics_buffer, 1024 / 2, 768 / 2 - 25, 100, 0x00119911);
-    console.draw_triangle(video_buffer.frame_buffer_base, 1024 / 2, 768 / 3 - 25, 100, 0x00119911);
-
     // Set kernel boot info.
-    // boot_info.memory_map = memory_map;
-    // boot_info.memory_map_size = memory_map_size;
-    // boot_info.memory_map_descriptor_size = descriptor_size;
+    var boot_info = BootInfo{
+        .video_buff = graphics_output_protocol.?.mode,
+        .memory_map = memory_map,
+        .memory_map_size = memory_map_size,
+        .memory_map_descriptor_size = descriptor_size,
+    };
+
+    // This shows that the boot info is working (accessing video buffer after exitBootServices)
+    console.draw_triangle(boot_info.video_buff.frame_buffer_base, 1024 / 2, 768 / 3 - 25, 100, 0x00119911);
 
     // Cast pointer to kernel entry.
     // Jump to kernel entry.
-    var boot_info: *u64 = @intToPtr(*u64, 0x100000);
-    boot_info.* = @ptrToInt(&video_buffer);
+    var boot_info_ptr: *u64 = @intToPtr(*u64, 0x100000);
+    boot_info_ptr.* = @ptrToInt(&boot_info);
     @intToPtr(fn() callconv(.C) void, entry_point)();
 
     // Should never make it here
     return uefi.Status.LoadError;
 }
 
-const VideoBuffer = extern struct {
-    frame_buffer_base: u64,
-    frame_buffer_size: u64,
+const BootInfo = extern struct {
+    video_buff: *uefi.protocols.GraphicsOutputProtocolMode,
+    memory_map: [*]uefi.tables.MemoryDescriptor,
+    memory_map_size: u64,
+    memory_map_descriptor_size: u64,
 };
