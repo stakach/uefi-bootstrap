@@ -37,7 +37,7 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
 
         console.printf("    current mode = {}\r\n", .{graphics_output_protocol.?.mode.mode});
 
-        // TODO:: search for compatible mode
+        // TODO:: search for compatible mode and set 1024x768? or make triangles resolution independent
         //_ = graphics_output_protocol.?.setMode(2);
     } else {
         console.puts("[error] unable to configure graphics mode\r\n");
@@ -136,9 +136,11 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     // This shows that the boot info is working (accessing video buffer after exitBootServices)
     console.draw_triangle(boot_info.video_buff.frame_buffer_base, 1024 / 2, 768 / 3 - 25, 100, 0x00119911);
 
+    // Put the boot information in a pre-determined location
+    var boot_info_ptr: *u64 = @intToPtr(*u64, 0x100000);
+
     // Cast pointer to kernel entry.
     // Jump to kernel entry.
-    var boot_info_ptr: *u64 = @intToPtr(*u64, 0x100000);
     boot_info_ptr.* = @ptrToInt(&boot_info);
     @intToPtr(fn() callconv(.C) void, entry_point)();
 

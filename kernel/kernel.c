@@ -3,10 +3,11 @@
 
 // https://github.com/JSBattista/Characters_To_Linux_Buffer_THE_HARD_WAY/blob/master/display.c
 
-#define DESIRED_HREZ            1024
-#define DESIRED_VREZ             768
+#define DESIRED_HREZ 1024
+#define DESIRED_VREZ 768
 
-void drawTriangle(uint64_t lfb_base_addr, int center_x, int center_y, int width, uint32_t color ) {
+// https://forum.osdev.org/viewtopic.php?f=1&t=26796
+void drawTriangle(uint64_t lfb_base_addr, int center_x, int center_y, int width, uint32_t color) {
     uint32_t* at = (uint32_t*)lfb_base_addr;
     int row, col;
 
@@ -22,16 +23,25 @@ void drawTriangle(uint64_t lfb_base_addr, int center_x, int center_y, int width,
     }
 };
 
+typedef struct pixel_bitmask {
+  uint32_t red_mask;
+  uint32_t green_mask;
+  uint32_t blue_mask;
+  uint32_t reserved_mask;
+} PixelBitmask;
 
 typedef struct graphics_mode {
-	uint32_t max_mode;
-	uint32_t mode;
-
+  uint32_t version;
+  uint32_t horizontal_resolution;
+  uint32_t vertical_resolution;
+  uint32_t pixel_format;  // technically an enum
+  PixelBitmask pixel_information;
+  uint32_t pixels_per_scan_line;
 } GraphicsMode;
 
 typedef struct graphics_output {
-	uint32_t max_mode;
-	uint32_t mode;
+  uint32_t max_mode;
+  uint32_t mode;
   GraphicsMode *info;
   uint64_t size_of_info;
   uint64_t frame_buffer_base;
@@ -40,7 +50,7 @@ typedef struct graphics_output {
 
 typedef struct boot_info {
   // UEFI GraphicsOutputProtocolMode structure
-  GraphicsOutput *video_buff;
+  GraphicsOutput *video;
 
   // UEFI memory map
   void *memory_map;
@@ -59,6 +69,6 @@ extern void* kernel_start;
 extern void* kernel_end;
 
 void kernel_main() {
-  drawTriangle(boot_info->video_buff->frame_buffer_base, 1024 / 2, 768 / 2 - 25, 100, 0x00119911);
+  drawTriangle(boot_info->video->frame_buffer_base, 1024 / 2, 768 / 2 - 25, 100, 0x00119911);
 	while(1);
 };

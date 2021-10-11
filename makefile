@@ -1,5 +1,5 @@
-.PHONY : uefi_bootstrap
-uefi_bootstrap : bin/uefi_bootstrap.obj bin/bootx64.efi
+.PHONY: bootstrap
+bootstrap: bin/kernel.elf
 
 # we want to use clang and output a PE/COFF formatted file
 # these are the zig flags
@@ -26,11 +26,14 @@ LDFLAGS+= \
         -Wl,-subsystem:efi_application \
         -fuse-ld=lld
 
-# src = $(wildcard src/*.zig)
-# obj = $(patsubst %.zig,bin/%.obj,$(src))
+bin/kernel.elf: bin/efi/boot bin/uefi_bootstrap.obj bin/efi/boot/bootx64.efi
+	cd kernel && make
 
-bin/uefi_bootstrap.obj : src/uefi_bootstrap.zig
+bin/efi/boot:
+	mkdir -p $@
+
+bin/uefi_bootstrap.obj: bootstrap/uefi_bootstrap.zig
 	zig build-obj $(ZFLAGS) -femit-bin=$@ -cflags $(CFLAGS) -- $^
 
-bin/bootx64.efi : bin/uefi_bootstrap.obj
-	clang $(CFLAGS) -o $@ $^ $(LDFLAGS)
+bin/efi/boot/bootx64.efi: bin/uefi_bootstrap.obj
+	clang $(CFLAGS) -o $@ bin/uefi_bootstrap.obj $(LDFLAGS)

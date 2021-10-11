@@ -1,5 +1,5 @@
 .PHONY : uefi_kernel
-uefi_kernel : kernel.elf
+uefi_kernel : ../bin/kernel.elf
 
 # we want to use clang and output a PE/COFF formatted file
 # these are the zig flags
@@ -28,5 +28,5 @@ LDFLAGS+= \
 # src = $(wildcard src/*.zig)
 # obj = $(patsubst %.zig,bin/%.obj,$(src))
 
-kernel.elf : kernel.c
+../bin/kernel.elf : kernel.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
