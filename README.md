@@ -62,3 +62,22 @@ unmount the disk before booting it in VirtualBox
 Starting the VM will now boot the bootx64.efi file
 
 <img src="https://user-images.githubusercontent.com/368013/136746021-11f16641-0666-4cdc-bd5a-5d9975eba328.png" alt="unmount" width="700"/>
+
+
+## Diving into the code
+
+The process of booting should be fairly simple to follow along looking at `uefi_bootstrap.zig`
+The real trick with UEFI code is that
+
+* it needs to be in PE/COFF format (think Windows .exe files)
+* conform to a particular entrypoint format (`-Wl,-entry:efi_main` in the make file)
+
+The bootstrap code likewise expects a few things of the kernel.elf file:
+
+* Segments need to be 4kb aligned - for paging support
+* the entry point takes no params and returns void
+* the boot_info structure is going to be stored at address 1MB
+  * (no matter where the elf segments request to be loaded)
+
+Take a look at `kernel.ld` to see how this is laid out.
+For instance I currently have the `boot_info` label in the `text` section. But I could probably swap around the text and data sections if I wanted boot_info as part of data or bss
