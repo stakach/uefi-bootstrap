@@ -81,3 +81,7 @@ The bootstrap code likewise expects a few things of the kernel.elf file:
 
 Take a look at `kernel.ld` to see how this is laid out.
 For instance I currently have the `boot_info` label in the `text` section. But I could probably swap around the text and data sections if I wanted boot_info as part of data or bss
+
+### Accessing the full address space
+
+https://eli.thegreenplace.net/2012/01/03/understanding-the-x64-code-models
