@@ -5,24 +5,27 @@ uefi_kernel : ../bin/kernel.elf
 # these are the zig flags
 CC = clang
 
-# we want a freestanding executable
+# we want a freestanding executable with access to the full x64 address space
+# https://eli.thegreenplace.net/2012/01/03/understanding-the-x64-code-models
 CFLAGS+= \
         -target x86_64-unknown-linux-elf \
         -ffreestanding \
-				-O2                   \
-				-Wall                 \
+				-mcmodel=large \
+				-fno-pic       \
+				-O2            \
+				-Wall          \
 				-Wextra
 
 # force use of LLVM Linker and output a PE/COFF formatted file
 LDFLAGS+= \
         -target x86_64-unknown-linux-elf \
-        -nostdlib \
-				-static \
-				-ffreestanding    \
-				-O2               \
-				-T kernel.ld \
+        -nostdlib               \
+				-static                 \
+				-ffreestanding          \
+				-O2                     \
+				-T kernel.ld            \
 				-z max-page-size=0x1000 \
-        -Wl,-ekernel_main \
+        -Wl,-ekernel_main       \
         -fuse-ld=lld
 
 # src = $(wildcard src/*.zig)

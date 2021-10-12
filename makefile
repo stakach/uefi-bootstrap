@@ -14,8 +14,10 @@ ZFLAGS = \
 CFLAGS+= \
         -target x86_64-unknown-windows \
         -ffreestanding \
-        -fshort-wchar \
-        -mno-red-zone \
+				-mcmodel=large \
+				-fno-pic       \
+        -fshort-wchar  \
+        -mno-red-zone  \
 				-Wall
 
 # force use of LLVM Linker and output a PE/COFF formatted file
