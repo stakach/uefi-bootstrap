@@ -63,14 +63,24 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     }
     console.puts(" [done]\r\n");
 
-    // Start moving the kernel image into memory (\kernel.elf)
+    // Start moving the kernel image into memory (\kernelx64.elf or \kernelaa64.elf)
     console.puts("loading kernel...\r\n");
     var entry_point: u64 = 0;
-    result = load_kernel_image(
-        root_file_system,
-        &[_:0]u16{ '\\', 'k', 'e', 'r', 'n', 'e', 'l', '.', 'e', 'l', 'f' },
-        &entry_point
-    );
+
+    // different images for different architectures
+    result = switch (@import("builtin").target.cpu.arch) {
+        .x86_64 => load_kernel_image(
+                root_file_system,
+                &[_:0]u16{ '\\', 'k', 'e', 'r', 'n', 'e', 'l', 'x', '6', '4', '.', 'e', 'l', 'f' },
+                &entry_point
+            ),
+        .aarch64 => load_kernel_image(
+                root_file_system,
+                &[_:0]u16{ '\\', 'k', 'e', 'r', 'n', 'e', 'l', 'a', 'a', '6', '4', '.', 'e', 'l', 'f' },
+                &entry_point
+            ),
+        else => @compileError("unsupported architecture"),
+    };
     if (result != uefi.Status.Success) {
         console.puts(" [failed]\r\n");
         console.printf("ERROR {}: loading kernel\r\n", .{result});

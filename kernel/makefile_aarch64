@@ -1,5 +1,5 @@
 .PHONY : uefi_kernel
-uefi_kernel : ../bin/kernel.elf
+uefi_kernel : ../bin/kernelaa64.elf
 
 # we want to use clang and output a PE/COFF formatted file
 # these are the zig flags
@@ -8,7 +8,7 @@ CC = clang
 # we want a freestanding executable with access to the full x64 address space
 # https://eli.thegreenplace.net/2012/01/03/understanding-the-x64-code-models
 CFLAGS+= \
-        -target x86_64-unknown-linux-elf \
+        -target aarch64-unknown-linux-elf \
         -ffreestanding \
 				-mcmodel=large \
 				-fno-pic       \
@@ -18,7 +18,7 @@ CFLAGS+= \
 
 # force use of LLVM Linker and output a PE/COFF formatted file
 LDFLAGS+= \
-        -target x86_64-unknown-linux-elf \
+        -target aarch64-unknown-linux-elf \
         -nostdlib               \
 				-static                 \
 				-ffreestanding          \
@@ -28,8 +28,5 @@ LDFLAGS+= \
         -Wl,-ekernel_main       \
         -fuse-ld=lld
 
-# src = $(wildcard src/*.zig)
-# obj = $(patsubst %.zig,bin/%.obj,$(src))
-
-../bin/kernel.elf : kernel.c
+../bin/kernelaa64.elf : kernel.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)

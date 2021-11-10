@@ -4,10 +4,18 @@ This should be a very simple jumping off point to modern kernel development.
 
 The idea behind this project is to provide an easy to understand, minimalist bootstrap that lowers the barrier to entry for any new comers.
 
-Code should work for both
+Code works for both
 
 * x86_64
-* AArch64 (need to change targets in makefile)
+* AArch64
+
+run `./build.sh` and you can boot the resulting example kernel on both x86_64 and AArch64
+
+
+### Crystal Kernel
+
+This bootstrap is being used to load this hobby OS
+https://github.com/stakach/crystal-kernel
 
 
 ## Getting started
@@ -23,11 +31,15 @@ Very easy to test and run on Windows with [VirtualBox](https://www.virtualbox.or
 
 EFI expects the bootable file to be in COFF/PE32+ format
 
-1. run `make`
+* run `./build.sh` to clean and build for all architectures
+
+you can also do this manually
+
+1. run `make -f makefile_x86_64`
 2. this will output
   * `bin/efi/boot/bootx64.efi`
-  * `bin/kernel.elf`
-3. you can expect symbols in the object files using `nm -C bin/uefi_bootstrap.obj` (or `kernel.elf`)
+  * `bin/kernelx64.elf`
+3. you can expect symbols in the object files using `nm -C bin/uefi_bootstrap.obj` (or `kernelx64.elf`)
   * anything with a `U` tag, i.e. `U memcpy` means memcpy needs to be defined in your project
 
 
@@ -85,3 +97,5 @@ For instance I currently have the `boot_info` label in the `text` section. But I
 ### Accessing the full address space
 
 https://eli.thegreenplace.net/2012/01/03/understanding-the-x64-code-models
+
+* this flag is set in the makefile
