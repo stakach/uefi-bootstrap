@@ -37,10 +37,10 @@ you can also do this manually
 
 1. run `make -f makefile_x86_64`
 2. this will output
-  * `bin/efi/boot/bootx64.efi`
-  * `bin/kernelx64.elf`
+   * `bin/efi/boot/bootx64.efi`
+   * `bin/kernelx64.elf`
 3. you can expect symbols in the object files using `nm -C bin/uefi_bootstrap.obj` (or `kernelx64.elf`)
-  * anything with a `U` tag, i.e. `U memcpy` means memcpy needs to be defined in your project
+   * anything with a `U` tag, i.e. `U memcpy` means memcpy needs to be defined in your project
 
 
 ## Create a disk image for booting
