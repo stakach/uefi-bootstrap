@@ -45,7 +45,7 @@ you can also do this manually
 
 ## Create a disk image for booting
 
-Very simple to do this on Windows
+Very simple to do this on Windows, for macOS see [Crystal Kernel](https://github.com/stakach/crystal-kernel#development-on-macos) which builds disk images as part of the build script
 
 * Disk Management (`diskmgmt.msc`)
   * Action -> Create VHD
