@@ -20,7 +20,7 @@ https://github.com/stakach/crystal-kernel
 
 ## Getting started
 
-Very easy to test and run on Windows with [VirtualBox](https://www.virtualbox.org/)
+Very easy to test and run on Windows with [VirtualBox](https://www.virtualbox.org/) see [Crystal Kernel](https://github.com/stakach/crystal-kernel#development-on-macos) for details on how to test and even step through debug your kernel on macOS.
 
 * Compile on Win Linux layer, macOS or Linux
 * Clang + LLVM toolchain
