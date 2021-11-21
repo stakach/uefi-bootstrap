@@ -66,18 +66,21 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     // Start moving the kernel image into memory (\kernelx64.elf or \kernelaa64.elf)
     console.puts("loading kernel...\r\n");
     var entry_point: u64 = 0;
+    var kernel_start: u64 = 0;
 
     // different images for different architectures
     result = switch (@import("builtin").target.cpu.arch) {
         .x86_64 => load_kernel_image(
                 root_file_system,
                 &[_:0]u16{ '\\', 'k', 'e', 'r', 'n', 'e', 'l', 'x', '6', '4', '.', 'e', 'l', 'f' },
-                &entry_point
+                &entry_point,
+                &kernel_start
             ),
         .aarch64 => load_kernel_image(
                 root_file_system,
                 &[_:0]u16{ '\\', 'k', 'e', 'r', 'n', 'e', 'l', 'a', 'a', '6', '4', '.', 'e', 'l', 'f' },
-                &entry_point
+                &entry_point,
+                &kernel_start
             ),
         else => @compileError("unsupported architecture"),
     };
@@ -146,8 +149,8 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     // This shows that the boot info is working (accessing video buffer after exitBootServices)
     console.draw_triangle(boot_info.video_buff.frame_buffer_base, 1024 / 2, 768 / 3 - 25, 100, 0x00119911);
 
-    // Put the boot information in a pre-determined location
-    var boot_info_ptr: *u64 = @intToPtr(*u64, 0x100000);
+    // Put the boot information at the start of the kernel
+    var boot_info_ptr: *u64 = @intToPtr(*u64, kernel_start);
     boot_info_ptr.* = @ptrToInt(&boot_info);
 
     // Cast pointer to kernel entry.
