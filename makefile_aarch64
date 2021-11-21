@@ -18,15 +18,17 @@ CFLAGS+= \
 				-fno-pic       \
         -fshort-wchar  \
         -mno-red-zone  \
-				-Wall
+        -Wall \
+        -MMD \
+        -Werror \
+        -pedantic
 
 # force use of LLVM Linker and output a PE/COFF formatted file
 LDFLAGS+= \
-        -target aarch64-unknown-windows \
-        -nostdlib \
-        -Wl,-entry:efi_main \
-        -Wl,-subsystem:efi_application \
-        -fuse-ld=lld
+        -flavor link \
+        -entry:efi_main \
+        -subsystem:efi_application
+
 
 bin/kernelaa64.elf: bin/efi/boot bin/uefi_bootstrap.obj bin/efi/boot/bootaa64.efi
 	cd kernel && make -f makefile_aarch64
@@ -38,4 +40,4 @@ bin/uefi_bootstrap.obj: bootstrap/uefi_bootstrap.zig
 	zig build-obj $(ZFLAGS) -femit-bin=$@ -cflags $(CFLAGS) -- $^
 
 bin/efi/boot/bootaa64.efi: bin/uefi_bootstrap.obj
-	clang $(CFLAGS) -o $@ bin/uefi_bootstrap.obj $(LDFLAGS)
+	lld $(LDFLAGS) $^ -out:$@
