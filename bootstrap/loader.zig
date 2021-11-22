@@ -9,6 +9,7 @@ const bootstrap = @import("./uefi_bootstrap.zig");
 pub fn load_kernel_image(
     file_system: *uefi.protocols.FileProtocol,
     file_path: [*:0]const u16,
+    base_physical_address: u64,
     kernel_entry_point: *u64,
     kernel_start_address: *u64,
 ) uefi.Status {
