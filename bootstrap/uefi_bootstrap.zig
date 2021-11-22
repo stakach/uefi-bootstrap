@@ -179,6 +179,10 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
         .memory_map_descriptor_size = descriptor_size,
     };
 
+    // Put the boot information at the start of the kernel
+    var boot_info_ptr: *u64 = @intToPtr(*u64, base_address);
+    boot_info_ptr.* = @ptrToInt(&boot_info);
+
     // Prepare the memory map to be configured with virtual memory
     mem_index = 0;
     mem_count = memory_map_size / descriptor_size;
@@ -199,12 +203,8 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     result = runtime_services.setVirtualAddressMap(memory_map_size, descriptor_size, descriptor_version, memory_map);
     if (result != uefi.Status.Success) {
         console.draw_triangle(boot_info.video_buff.frame_buffer_base, 1024 / 2, 768 / 3 - 25, 100, 0x00119911);
-        return result;
+        return uefi.Status.LoadError;
     }
-
-    // Put the boot information at the start of the kernel
-    var boot_info_ptr: *u64 = @intToPtr(*u64, kernel_start);
-    boot_info_ptr.* = @ptrToInt(&boot_info);
 
     // Cast pointer to kernel entry.
     // Jump to kernel entry.
