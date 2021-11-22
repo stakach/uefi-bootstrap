@@ -46,3 +46,46 @@ export fn memset (dest: [*:0]u8, value: u8, length: u64) [*:0]u8 {
     }
     return dest;
 }
+
+// This is here for testing video buffer memory after calling exitBootServices
+// https://forum.osdev.org/viewtopic.php?f=1&t=26796
+pub fn draw_triangle(arg_lfb_base_addr: u64, arg_center_x: u64, arg_center_y: u64, arg_width: u64, arg_color: u32) void {
+    var lfb_base_addr = arg_lfb_base_addr;
+    var center_x = arg_center_x;
+    var center_y = arg_center_y;
+    var width = arg_width;
+    var color = arg_color;
+    var at: [*c]u32 = @intToPtr([*c]u32, lfb_base_addr);
+    var row: u64 = undefined;
+    var col: u64 = undefined;
+    at += (1024 *% (center_y -% width / 2) +% center_x -% width / 2);
+    {
+        row = 0;
+        while (row < (width / 2)) : (row +%= 1) {
+            {
+                col = 0;
+                while (col < (width -% (row *% 2))) : (col +%= 1) {
+                    (blk: {
+                        const ref = &at;
+                        const tmp = ref.*;
+                        ref.* += 1;
+                        break :blk tmp;
+                    }).?.* = color;
+                }
+            }
+            at += 1024 -% col;
+            {
+                col = 0;
+                while (col < (width -% (row *% 2))) : (col +%= 1) {
+                    (blk: {
+                        const ref = &at;
+                        const tmp = ref.*;
+                        ref.* += 1;
+                        break :blk tmp;
+                    }).?.* = color;
+                }
+            }
+            at += (1024 -% col) +% 1;
+        }
+    }
+}

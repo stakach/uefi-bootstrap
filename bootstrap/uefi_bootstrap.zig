@@ -197,7 +197,10 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
 
     // Configure the virtual memory
     result = runtime_services.setVirtualAddressMap(memory_map_size, descriptor_size, descriptor_version, memory_map);
-    // TODO:: draw something on the screen to indicate success or failure
+    if (result != uefi.Status.Success) {
+        console.draw_triangle(boot_info.video_buff.frame_buffer_base, 1024 / 2, 768 / 3 - 25, 100, 0x00119911);
+        return result;
+    }
 
     // Put the boot information at the start of the kernel
     var boot_info_ptr: *u64 = @intToPtr(*u64, kernel_start);
