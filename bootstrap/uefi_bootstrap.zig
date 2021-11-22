@@ -7,13 +7,16 @@
 const uefi = @import("std").os.uefi;
 const fmt = @import("std").fmt;
 const console = @import("./console.zig");
+const runtime = @import("./uefi_runtime.zig");
 const load_kernel_image = @import("./loader.zig").load_kernel_image;
 
 pub var boot_services: *uefi.tables.BootServices = undefined;
+pub var runtime_services: *runtime.RuntimeServices = undefined;
 
 export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(.C) uefi.Status {
     console.out = system_table.con_out.?;
     boot_services = system_table.boot_services.?;
+    runtime_services = @ptrCast(*runtime.RuntimeServices, system_table.runtime_services);
 
     console.puts("bootloader started\r\n");
 
@@ -77,6 +80,8 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
         if (uefi.Status.Success != result) { return result; }
     }
 
+    console.printf("  -> memory map size: {}, descriptor size {}\r\n", .{memory_map_size, descriptor_size});
+
     var mem_index: usize = 0;
     var mem_count: usize = undefined;
     var mem_point: *uefi.tables.MemoryDescriptor = undefined;
@@ -86,7 +91,7 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
     mem_count = memory_map_size / descriptor_size;
     while (mem_index < mem_count) {
         mem_point = @intToPtr(*uefi.tables.MemoryDescriptor, @ptrToInt(memory_map) + (mem_index * descriptor_size));
-        if (mem_point.type == uefi.tables.MemoryType.ConventionalMemory) {
+        if (mem_point.type == uefi.tables.MemoryType.ConventionalMemory and mem_point.physical_start >= base_address) {
             base_address = mem_point.physical_start;
             num_pages = mem_point.number_of_pages;
             break;
@@ -106,12 +111,14 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
         .x86_64 => load_kernel_image(
                 root_file_system,
                 &[_:0]u16{ '\\', 'k', 'e', 'r', 'n', 'e', 'l', 'x', '6', '4', '.', 'e', 'l', 'f' },
+                base_address,
                 &entry_point,
                 &kernel_start
             ),
         .aarch64 => load_kernel_image(
                 root_file_system,
                 &[_:0]u16{ '\\', 'k', 'e', 'r', 'n', 'e', 'l', 'a', 'a', '6', '4', '.', 'e', 'l', 'f' },
+                base_address,
                 &entry_point,
                 &kernel_start
             ),
@@ -145,33 +152,6 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
             if (uefi.Status.Success != result) { return result; }
         }
 
-        console.printf("memory map size @{}\r\n", .{memory_map_size});
-        console.printf("memory map descriptor size @{}\r\n", .{descriptor_size});
-        mem_count = memory_map_size / descriptor_size;
-        while (mem_index < mem_count) {
-            mem_point = @intToPtr(*uefi.tables.MemoryDescriptor, @ptrToInt(memory_map) + (mem_index * descriptor_size));
-
-            // We want to change the virtual address of the loader data to match the ELF file
-            // all other entries need their virtual addresses configured (can keep them the same as physical)
-            if (mem_point.type == uefi.tables.MemoryType.LoaderData) {
-                console.printf("- @{}, phys@{}, virt@{}, page@{}\r\n",
-                    .{
-                        mem_point.type,
-                        mem_point.physical_start,
-                        mem_point.virtual_start,
-                        mem_point.number_of_pages
-                    }
-                );
-            }
-            mem_index += 1;
-        }
-
-        // NOTE:: can remove this once we are not calling console.print anymore
-        while (uefi.Status.BufferTooSmall == boot_services.getMemoryMap(&memory_map_size, memory_map, &memory_map_key, &descriptor_size, &descriptor_version)) {
-            result = boot_services.allocatePool(uefi.tables.MemoryType.BootServicesData, memory_map_size, @ptrCast(*[*]align(8) u8, &memory_map));
-            if (uefi.Status.Success != result) { return result; }
-        }
-
         // Pass the current image's handle and the memory map key to exitBootServices
         // to gain full control over the hardware.
         //
@@ -199,8 +179,25 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
         .memory_map_descriptor_size = descriptor_size,
     };
 
-    // This shows that the boot info is working (accessing video buffer after exitBootServices)
-    // console.draw_triangle(boot_info.video_buff.frame_buffer_base, 1024 / 2, 768 / 3 - 25, 100, 0x00119911);
+    // Prepare the memory map to be configured with virtual memory
+    mem_index = 0;
+    mem_count = memory_map_size / descriptor_size;
+    while (mem_index < mem_count) {
+        mem_point = @intToPtr(*uefi.tables.MemoryDescriptor, @ptrToInt(memory_map) + (mem_index * descriptor_size));
+
+        // We want to change the virtual address of the loader data to match the ELF file
+        // all other entries need their virtual addresses configured too
+        if (mem_point.type == uefi.tables.MemoryType.LoaderData) {
+            mem_point.virtual_start = kernel_start;
+        } else {
+            mem_point.virtual_start = mem_point.physical_start;
+        }
+        mem_index += 1;
+    }
+
+    // Configure the virtual memory
+    result = runtime_services.setVirtualAddressMap(memory_map_size, descriptor_size, descriptor_version, memory_map);
+    // TODO:: draw something on the screen to indicate success or failure
 
     // Put the boot information at the start of the kernel
     var boot_info_ptr: *u64 = @intToPtr(*u64, kernel_start);
@@ -208,7 +205,7 @@ export fn efi_main(handle: u64, system_table: uefi.tables.SystemTable) callconv(
 
     // Cast pointer to kernel entry.
     // Jump to kernel entry.
-    // @intToPtr(fn() callconv(.C) void, entry_point)();
+    @intToPtr(fn() callconv(.C) void, entry_point)();
 
     // Should never make it here
     return uefi.Status.LoadError;
