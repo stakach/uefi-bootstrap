@@ -9,6 +9,7 @@ const bootstrap = @import("./uefi_bootstrap.zig");
 pub fn load_kernel_image(
     file_system: *uefi.protocols.FileProtocol,
     file_path: [*:0]const u16,
+    base_physical_address: u64,
     kernel_entry_point: *u64,
     kernel_start_address: *u64,
 ) uefi.Status {
@@ -73,7 +74,7 @@ pub fn load_kernel_image(
     const program_headers = @ptrCast([*]const elf.Elf64_Phdr, program_headers_buffer);
     console.puts(" [done]\r\n");
 
-    result = load_program_segments(kernel_img_file, &header, program_headers, kernel_start_address);
+    result = load_program_segments(kernel_img_file, &header, program_headers, base_physical_address, kernel_start_address);
     if (result != uefi.Status.Success) { return result; }
 
     // free temporary buffers
@@ -102,6 +103,7 @@ fn load_program_segments(
     file: *uefi.protocols.FileProtocol,
     header: *elf.Header,
     program_headers: [*]const elf.Elf64_Phdr,
+    base_physical_address: u64,
     kernel_start_address: *u64,
 ) uefi.Status {
     const length = header.phnum;
@@ -116,24 +118,30 @@ fn load_program_segments(
     var loaded: u64 = 0;
     var index: u64 = 0;
     var set_start_address: bool = true;
+    var base_address_difference: u64 = 0;
 
     while (index < length) {
         if (program_headers[index].p_type == elf.PT_LOAD) {
             console.printf("[{}", .{index});
+
+            if (set_start_address) {
+                set_start_address = false;
+                kernel_start_address.* = program_headers[index].p_vaddr;
+                // calculate the difference between virtual and physical addresses
+                // we'll enable virtual addressing before jumping to the kernel
+                base_address_difference = program_headers[index].p_vaddr - base_physical_address;
+            }
+
             result = load_segment(
                 file,
                 program_headers[index].p_offset,
                 program_headers[index].p_filesz,
                 program_headers[index].p_memsz,
-                program_headers[index].p_vaddr,
+                program_headers[index].p_vaddr - base_address_difference,
             );
             if (result != uefi.Status.Success) { return result; }
             console.puts("].");
 
-            if (set_start_address) {
-                set_start_address = false;
-                kernel_start_address.* = program_headers[index].p_vaddr;
-            }
             loaded += 1;
         }
         index += 1;
